@@ -1,0 +1,4 @@
+[core]
+    remote = myremote
+['remote "myremote"']
+    url = C:\Users\andre\OneDrive\Desktop\dvc-storage\telco_churn
