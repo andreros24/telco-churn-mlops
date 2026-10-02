@@ -6,6 +6,7 @@ Load processed data, train a model (RandomForest) handling the unbalanced classe
 evaluate performance metric and store the model and metrics.
 """
 
+import yaml
 import json
 import pandas as pd
 import numpy as np
@@ -32,6 +33,13 @@ METRICS_PATH = Path("metrics.json")
 
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
+# --- params from .yaml file ---
+def load_params(section: str) -> dict:
+    """Carica una sezione specifica da params.yaml"""
+    with open("params.yaml") as f:
+        params = yaml.safe_load(f)
+    return params[section]
+
 
 def load_processed_data():
     # function to load data and return the X and y for train and test
@@ -47,25 +55,26 @@ def load_processed_data():
     return X_train, X_test, y_train, y_test
 
 # Using cross validation to find the best RandomForest model
-def train_rf(X_train, y_train) -> RandomForestClassifier:
+def train_rf(X_train, y_train, params) -> RandomForestClassifier:
     model=RandomForestClassifier(class_weight='balanced', max_features='sqrt',
-                                 random_state=42, n_jobs=-1, max_depth=None)
-    grid_values = {'n_estimators' : [100,150,200,250], 'min_samples_split' : [2,5,7],
-                   'min_samples_leaf' : [1,5,9]}
-    grid = GridSearchCV(model, param_grid=grid_values, scoring="f1", cv=4)
+                                 random_state=params['random_state'], n_jobs=-1, max_depth=None)
+    grid_values = {'n_estimators' : params['param_grid']['n_estimators'],
+                   'min_samples_split' : params['param_grid']['min_sample_split'],
+                   'min_samples_leaf' : params['param_grid']['min_samples_leaf']}
+    grid = GridSearchCV(model, param_grid=grid_values, scoring="f1", cv=params['cv_folds'])
     grid.fit(X_train, y_train)  
 
     return grid.best_estimator_, grid.best_params_
 
-def train_logistic(X_train, y_train) -> LogisticRegression:
+def train_logistic(X_train, y_train, params) -> LogisticRegression:
     model = LogisticRegression(l1_ratio=1, solver='liblinear', class_weight='balanced',
-                               random_state=42, penalty='l1')
+                               random_state=params['random_state'], penalty='deprecated')
     cs = l1_min_c(X_train, y_train, loss="log") * np.logspace(0, 2.5, 50)
-    grid_values = {'C' : cs}
-    grid = GridSearchCV(model, param_grid=grid_values, scoring="f1", cv=5)
+    grid_values = {'C' : params['param_grid']['C']}
+    grid = GridSearchCV(model, param_grid=grid_values, scoring="f1", cv=params['cv_folds'])
     grid.fit(X_train, y_train)
 
-    return grid.best_estimator_
+    return grid.best_estimator_, grid.best_params_
 
 # A function to evaluate the model
 def evaluate_model(model, X_test, y_test) -> dict:
@@ -101,17 +110,21 @@ def main():
     X_train, X_test, y_train, y_test = load_processed_data()
 
     print("Training model...")
-    model, params = train_rf(X_train, y_train)
-    model_logistic = train_logistic(X_train=X_train, y_train=y_train)
+    params_rf = load_params('train_rf')
+    params_logistic = load_params('train_logistic')
+    model_rf, best_params_rf = train_rf(X_train, y_train, params_rf)
+    model_logistic, best_params_log = train_logistic(X_train=X_train, y_train=y_train, params=params_logistic)
     
     print("Evaluation...")
-    metrics = evaluate_model(model, X_test, y_test)
-    metrics["feature_importance_top10"] = get_feature_importance(
-        model, X_train.columns.tolist()
+    metrics_rf = evaluate_model(model_rf, X_test, y_test)
+    metrics_rf["feature_importance_top10"] = get_feature_importance(
+        model_rf, X_train.columns.tolist()
     )
-    metrics = {'model_type':'Random Forest', **metrics}
+    metrics_rf["parameters"] = best_params_rf
+    metrics_rf = {'model_type':'Random Forest', **metrics_rf}
 
     metrics_logistic = evaluate_model(model_logistic, X_test, y_test)
+    metrics_logistic["parameters"]= best_params_log
     metrics_logistic = {'model_type':'logistic', **metrics_logistic}
     features = model_logistic.feature_names_in_[(model_logistic.coef_!=0).tolist()[0]].tolist()
     values = model_logistic.coef_[model_logistic.coef_!=0].tolist()
@@ -123,18 +136,18 @@ def main():
     
 
     print("Saving model...")
-    joblib.dump(model, MODELS_DIR / "model.pkl")
+    joblib.dump(model_rf, MODELS_DIR / "model_rf.pkl")
     joblib.dump(model_logistic, MODELS_DIR / "model_logistic.pkl")
 
     print("Saving metrics...")
     with open(METRICS_PATH, "w") as f:
-        json.dump(metrics, f, indent=2)
+        json.dump(metrics_rf, f, indent=2)
         json.dump(metrics_logistic, f, indent=2)
 
 
-    print(f"Done. Accuracy: {metrics['accuracy']:.3f}, "
-          f"F1: {metrics['f1_score']:.3f}, "
-          f"ROC-AUC: {metrics['roc_auc']:.3f}")
+    print(f"Done. Results Random Forest. Accuracy: {metrics_rf['accuracy']:.3f}, "
+          f"F1: {metrics_rf['f1_score']:.3f}, "
+          f"ROC-AUC: {metrics_rf['roc_auc']:.3f}")
 
 
 if __name__ == "__main__":
