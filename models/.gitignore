@@ -1,1 +1,3 @@
-*.pkl
+/preprocessor.pkl
+/model_rf.pkl
+/model_logistic.pkl

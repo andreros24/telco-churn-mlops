@@ -1,0 +1,133 @@
+schema: '2.0'
+stages:
+  prepare:
+    cmd: python src/data_prep.py
+    deps:
+    - path: data/raw/telco_churn.csv
+      hash: md5
+      md5: 0f9de68e012bd3aed5fa7cdc9fc421af
+      size: 977501
+    - path: src/data_prep.py
+      hash: md5
+      md5: fd1f9cf6ed238a9150b82e192fed2344
+      size: 4126
+    params:
+      params.yaml:
+        prepare:
+          test_size: 0.2
+          random_state: 42
+    outs:
+    - path: data/processed/test.csv
+      hash: md5
+      md5: 72274b0cab544b2a8007f50580a23ce9
+      size: 330677
+    - path: data/processed/train.csv
+      hash: md5
+      md5: 6484b35f1443e5a61d523389f9a53640
+      size: 1318325
+    - path: models/preprocessor.pkl
+      hash: md5
+      md5: 844d619b11be0b385650cadde05c02b0
+      size: 6676
+  train:
+    cmd: python src/train.py
+    deps:
+    - path: data/processed/test.csv
+      hash: md5
+      md5: 72274b0cab544b2a8007f50580a23ce9
+      size: 330677
+    - path: data/processed/train.csv
+      hash: md5
+      md5: 6484b35f1443e5a61d523389f9a53640
+      size: 1318325
+    - path: src/train.py
+      hash: md5
+      md5: 9d3135bb0d47e03f8f2e2394c1e5c023
+      size: 5806
+    params:
+      params.yaml:
+        train_logistic:
+          random_state: 42
+          cv_folds: 5
+          param_grid:
+            C:
+            - 0.00075643
+            - 0.00085072
+            - 0.00095677
+            - 0.00107604
+            - 0.00121018
+            - 0.00136104
+            - 0.0015307
+            - 0.00172152
+            - 0.00193612
+            - 0.00217747
+            - 0.00244891
+            - 0.00275418
+            - 0.00309752
+            - 0.00348364
+            - 0.00391791
+            - 0.00440631
+            - 0.00495559
+            - 0.00557334
+            - 0.0062681
+            - 0.00704947
+            - 0.00792824
+            - 0.00891656
+            - 0.01002807
+            - 0.01127815
+            - 0.01268406
+            - 0.01426523
+            - 0.0160435
+            - 0.01804345
+            - 0.02029271
+            - 0.02282235
+            - 0.02566734
+            - 0.02886697
+            - 0.03246546
+            - 0.03651254
+            - 0.04106411
+            - 0.04618307
+            - 0.05194015
+            - 0.0584149
+            - 0.06569678
+            - 0.07388639
+            - 0.08309691
+            - 0.09345559
+            - 0.10510556
+            - 0.11820779
+            - 0.13294332
+            - 0.14951574
+            - 0.16815405
+            - 0.18911576
+            - 0.21269052
+            - 0.23920406
+        train_rf:
+          random_state: 42
+          cv_folds: 4
+          param_grid:
+            n_estimators:
+            - 100
+            - 150
+            - 200
+            - 250
+            min_sample_split:
+            - 2
+            - 5
+            - 7
+            min_samples_leaf:
+            - 1
+            - 5
+            - 9
+    outs:
+    - path: metrics.json
+      hash: md5
+      md5: 91f404350984873a21aa70461edbedaf
+      size: 2560
+    - path: models/model_logistic.pkl
+      hash: md5
+      md5: 6199a6300e812fb0e125317211600fed
+      size: 2779
+    - path: models/model_rf.pkl
+      hash: md5
+      md5: 9dac008db195ef571472100cafad23b5
+      size: 8393097
