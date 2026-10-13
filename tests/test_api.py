@@ -35,8 +35,14 @@ def test_predict_valid_input():
     response = client.post("/predict", json=payload)
     assert response.status_code == 200
     data = response.json()
-    assert data["churn_prediction"] in ["Yes", "No"]
-    assert 0 <= data["churn_probability"] <= 1
+    assert data["churn_prediction_rf"] in ["Yes", "No"]
+    assert data["churn_prediction_logistic"] in ["Yes", "No"]
+    assert data["churn_prediction_xgb"] in ["Yes", "No"]
+    assert data["churn_prediction_overall"] in ["Yes", "No"]
+    assert 0 <= data["churn_probability_rf"] <= 1
+    assert 0 <= data["churn_probability_logistic"] <= 1
+    assert 0 <= data["churn_probability_xgb"] <= 1
+    assert 0 <= data["churn_probability_mean"] <= 1
 
 
 def test_predict_invalid_input():
