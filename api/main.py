@@ -20,6 +20,7 @@ try:
     preprocessor = joblib.load(MODELS_DIR / "preprocessor.pkl")
     model_rf = joblib.load(MODELS_DIR / "model_rf.pkl")
     model_logistic = joblib.load(MODELS_DIR / "model_logistic.pkl")
+    model_xgb = joblib.load(MODELS_DIR / "model_xgb.pkl")
 except FileNotFoundError as e:
     raise RuntimeError(
         f"Models or preprocessor not found in {MODELS_DIR}. "
@@ -87,8 +88,14 @@ class CustomerData(BaseModel):
 
 
 class PredictionResponse(BaseModel):
-    churn_prediction: Literal["Yes", "No"]
-    churn_probability: float
+    churn_prediction_rf: Literal["Yes", "No"]
+    churn_prediction_logistic: Literal["Yes", "No"]
+    churn_prediction_xgb: Literal["Yes", "No"]
+    churn_prediction_overall: Literal["Yes", "No"]
+    churn_probability_rf: float
+    churn_probability_logistic: float
+    churn_probability_xgb: float
+    churn_probability_mean: float
 
 
 @app.get("/health")
@@ -109,9 +116,22 @@ def predict(customer: CustomerData):
         prediction_rf = model_rf.predict(processed)[0]
         probability_rf = model_rf.predict_proba(processed)[0][1]
 
+        prediction_logistic = model_logistic.predict(processed)[0]
+        probability_logistic = model_logistic.predict_proba(processed)[0][1]
+
+        prediction_xgb = model_xgb.predict(processed)[0]
+        probability_xgb = model_xgb.predict_proba(processed)[0][1]
+
         return PredictionResponse(
-            churn_prediction="Yes" if prediction_rf == 1 else "No",
-            churn_probability=round(float(probability_rf), 4),
+            churn_prediction_rf="Yes" if prediction_rf == 1 else "No",
+            churn_prediction_logistic="Yes" if prediction_logistic == 1 else "No",
+            churn_prediction_xgb="Yes" if prediction_xgb == 1 else "No",
+            churn_prediction_overall="Yes" if prediction_xgb+prediction_logistic+prediction_rf >= 2 else "No",
+            churn_probability_rf= round(float(probability_rf), 4),
+            churn_probability_logistic= round(float(probability_logistic), 4),
+            churn_probability_xgb= round(float(probability_xgb), 4),
+            churn_probability_mean= round((round(float(probability_xgb), 4)+ round(float(probability_logistic), 4) +
+                                    round(float(probability_rf), 4))/3, 4)
         )
 
     except Exception as e:

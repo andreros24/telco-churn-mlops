@@ -16,6 +16,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import l1_min_c
 from sklearn.model_selection import GridSearchCV
+from xgboost import XGBClassifier
 from sklearn.metrics import (
     accuracy_score,
     precision_score,
@@ -76,6 +77,17 @@ def train_logistic(X_train, y_train, params) -> LogisticRegression:
 
     return grid.best_estimator_, grid.best_params_
 
+def train_xgb(X_train, y_train, params) -> XGBClassifier:
+    model = XGBClassifier(scale_pos_weight= sum(y_train==0)/sum(y_train==1), subsample=0.7, colsample_bytree=0.3)
+    grid_values = {'learning_rate': params['param_grid']['learning_rate'],
+                   'n_estimators': params['param_grid']['n_estimators'],
+                   'max_depth': params['param_grid']['max_depth']}
+    grid = GridSearchCV(model, param_grid=grid_values, scoring='f1', cv=params['cv_folds'])
+    grid.fit(X_train, y_train)
+
+    return grid.best_estimator_, grid.best_params_
+
+
 # A function to evaluate the model
 def evaluate_model(model, X_test, y_test) -> dict:
     y_pred = model.predict(X_test)
@@ -112,8 +124,10 @@ def main():
     print("Training model...")
     params_rf = load_params('train_rf')
     params_logistic = load_params('train_logistic')
+    params_xgb = load_params('train_xgb')
     model_rf, best_params_rf = train_rf(X_train, y_train, params_rf)
     model_logistic, best_params_log = train_logistic(X_train=X_train, y_train=y_train, params=params_logistic)
+    model_xgb, best_params_xgb = train_xgb(X_train, y_train, params_xgb)
     
     print("Evaluation...")
     metrics_rf = evaluate_model(model_rf, X_test, y_test)
@@ -133,16 +147,21 @@ def main():
         feature = features[i]
         coef[feature]=round(value, ndigits=4)
     metrics_logistic['coefficients different from 0']=coef
-    
+
+    metrics_xgb = evaluate_model(model_xgb, X_test, y_test)
+    metrics_xgb['parameters']= best_params_xgb
+    metrics_xgb = {'model_type':'XGBoosting', **metrics_xgb}    
 
     print("Saving model...")
     joblib.dump(model_rf, MODELS_DIR / "model_rf.pkl")
     joblib.dump(model_logistic, MODELS_DIR / "model_logistic.pkl")
+    joblib.dump(model_xgb, MODELS_DIR / "model_xgb.pkl")
 
     print("Saving metrics...")
     with open(METRICS_PATH, "w") as f:
         json.dump(metrics_rf, f, indent=2)
         json.dump(metrics_logistic, f, indent=2)
+        json.dump(metrics_xgb, f, indent=2)
 
 
     print(f"Done. Results Random Forest. Accuracy: {metrics_rf['accuracy']:.3f}, "
